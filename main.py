@@ -59,4 +59,4 @@ for epoch in range(epochs):
 # Predictions
 y_pred_class = (y_pred > 0.5).astype(int)
 accuracy = np.mean(y_pred_class.flatten() == y)
-print(f"Training Accuracy: {accuracy * 100:.2f}%")
+print(f"Training Accuracy: {accuracy * 100:.4f}%") 
