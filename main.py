@@ -29,15 +29,27 @@ reg_lambda = 0.01
 def xavier_initialization(size_in, size_out):
     return np.random.randn(size_in, size_out) * np.sqrt(2. / (size_in + size_out))
 
-# Initialize weights and biases
-W1 = xavier_initialization(input_size, hidden_size_1)
-b1 = np.zeros(hidden_size_1)
-W2 = xavier_initialization(hidden_size_1, hidden_size_2)
-b2 = np.zeros(hidden_size_2)
-W3 = xavier_initialization(hidden_size_2, hidden_size_3)
-b3 = np.zeros(hidden_size_3)
-W4 = xavier_initialization(hidden_size_3, output_size)
-b4 = np.zeros(output_size)
+# Check if model weights file exists
+model_file = 'trained_models/model_weights_improved_v4.npz'
+if os.path.exists(model_file):
+    print("Loading pre-trained model weights...")
+    # Load the saved model weights
+    model = np.load(model_file)
+    W1, b1 = model['W1'], model['b1']
+    W2, b2 = model['W2'], model['b2']
+    W3, b3 = model['W3'], model['b3']
+    W4, b4 = model['W4'], model['b4']
+else:
+    # If no model, initialize weights randomly
+    print("Training new model...")
+    W1 = xavier_initialization(input_size, hidden_size_1)
+    b1 = np.zeros(hidden_size_1)
+    W2 = xavier_initialization(hidden_size_1, hidden_size_2)
+    b2 = np.zeros(hidden_size_2)
+    W3 = xavier_initialization(hidden_size_2, hidden_size_3)
+    b3 = np.zeros(hidden_size_3)
+    W4 = xavier_initialization(hidden_size_3, output_size)
+    b4 = np.zeros(output_size)
 
 # Activation function and its derivative (ReLU and softmax for output)
 def leaky_relu(x, alpha=0.01):
@@ -68,6 +80,7 @@ gradient_clip_value = 5  # Gradient clipping threshold
 losses = []
 
 # Training loop with mini-batch gradient descent
+
 for epoch in range(epochs):
     # Shuffle data at the start of each epoch
     indices = np.random.permutation(len(X_train))
