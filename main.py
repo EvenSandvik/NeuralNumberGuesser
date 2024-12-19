@@ -23,6 +23,7 @@ hidden_size_1 = 128
 hidden_size_2 = 64
 hidden_size_3 = 32  # Additional hidden layer for increased depth
 output_size = 10  # 10 digits (0-9)
+reg_lambda = 0.01
 
 # Xavier initialization (Glorot initialization)
 def xavier_initialization(size_in, size_out):
@@ -39,85 +40,108 @@ W4 = xavier_initialization(hidden_size_3, output_size)
 b4 = np.zeros(output_size)
 
 # Activation function and its derivative (ReLU and softmax for output)
-def relu(x):
-    return np.maximum(0, x)
+def leaky_relu(x, alpha=0.01):
+    return np.where(x > 0, x, alpha * x)  # Leaky ReLU
 
-def relu_derivative(x):
-    return (x > 0).astype(float)
+def leaky_relu_derivative(x, alpha=0.01):
+    return np.where(x > 0, 1, alpha)  # Derivative of Leaky ReLU
 
 def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))  # Numerical stability
     return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
-# Loss function (Cross-Entropy)
-def cross_entropy_loss(y_pred, y_true):
+# Loss function (Cross-Entropy with L2 Regularization)
+def cross_entropy_loss(y_pred, y_true, reg_lambda=0.01):
     m = y_true.shape[0]
-    return -np.sum(y_true * np.log(y_pred + 1e-8)) / m  # Adding small epsilon for numerical stability
+    log_loss = -np.sum(y_true * np.log(y_pred + 1e-8)) / m  # Adding small epsilon for numerical stability
+    # L2 regularization on weights
+    l2_loss = (reg_lambda / 2) * (np.sum(W1**2) + np.sum(W2**2) + np.sum(W3**2) + np.sum(W4**2))
+    return log_loss + l2_loss
 
-# Training parameters
-learning_rate = 0.01  # Lower learning rate for better stability
-epochs = 1000
+# Mini-batch Gradient Descent parameters
+batch_size = 64
+learning_rate = 0.0005  # Lower learning rate for better stability
+epochs = 100
+gradient_clip_value = 5  # Gradient clipping threshold
 
-# Training loop
+# To store the loss for visualization
+losses = []
+
+# Training loop with mini-batch gradient descent
 for epoch in range(epochs):
-    # Forward pass
-    hidden_input_1 = np.dot(X_train, W1) + b1
-    hidden_output_1 = relu(hidden_input_1)
+    # Shuffle data at the start of each epoch
+    indices = np.random.permutation(len(X_train))
+    X_train_shuffled = X_train[indices]
+    y_train_shuffled = y_train[indices]
 
-    hidden_input_2 = np.dot(hidden_output_1, W2) + b2
-    hidden_output_2 = relu(hidden_input_2)
+    # Mini-batch gradient descent
+    for i in range(0, len(X_train), batch_size):
+        X_batch = X_train_shuffled[i:i+batch_size]
+        y_batch = y_train_shuffled[i:i+batch_size]
 
-    hidden_input_3 = np.dot(hidden_output_2, W3) + b3
-    hidden_output_3 = relu(hidden_input_3)
+        # Forward pass
+        hidden_input_1 = np.dot(X_batch, W1) + b1
+        hidden_output_1 = leaky_relu(hidden_input_1)
 
-    final_input = np.dot(hidden_output_3, W4) + b4
-    y_pred = softmax(final_input)
+        hidden_input_2 = np.dot(hidden_output_1, W2) + b2
+        hidden_output_2 = leaky_relu(hidden_input_2)
 
-    # Loss calculation (Cross-Entropy)
-    loss = cross_entropy_loss(y_pred, y_train)
+        hidden_input_3 = np.dot(hidden_output_2, W3) + b3
+        hidden_output_3 = leaky_relu(hidden_input_3)
 
-    # Backpropagation
-    output_error = y_pred - y_train
-    output_delta = output_error  # Since softmax + cross-entropy combined simplifies the gradient
+        final_input = np.dot(hidden_output_3, W4) + b4
+        y_pred = softmax(final_input)
 
-    hidden_error_3 = np.dot(output_delta, W4.T)
-    hidden_delta_3 = hidden_error_3 * relu_derivative(hidden_output_3)
+        # Loss calculation (Cross-Entropy + L2 Regularization)
+        loss = cross_entropy_loss(y_pred, y_batch)
+        losses.append(loss)
 
-    hidden_error_2 = np.dot(hidden_delta_3, W3.T)
-    hidden_delta_2 = hidden_error_2 * relu_derivative(hidden_output_2)
+        # Backpropagation
+        output_error = y_pred - y_batch
+        output_delta = output_error  # Since softmax + cross-entropy combined simplifies the gradient
 
-    hidden_error_1 = np.dot(hidden_delta_2, W2.T)
-    hidden_delta_1 = hidden_error_1 * relu_derivative(hidden_output_1)
+        hidden_error_3 = np.dot(output_delta, W4.T)
+        hidden_delta_3 = hidden_error_3 * leaky_relu_derivative(hidden_output_3)
 
-    # Update weights and biases using gradient descent
-    W4 -= learning_rate * np.dot(hidden_output_3.T, output_delta)
-    b4 -= learning_rate * np.sum(output_delta, axis=0)
+        hidden_error_2 = np.dot(hidden_delta_3, W3.T)
+        hidden_delta_2 = hidden_error_2 * leaky_relu_derivative(hidden_output_2)
 
-    W3 -= learning_rate * np.dot(hidden_output_2.T, hidden_delta_3)
-    b3 -= learning_rate * np.sum(hidden_delta_3, axis=0)
+        hidden_error_1 = np.dot(hidden_delta_2, W2.T)
+        hidden_delta_1 = hidden_error_1 * leaky_relu_derivative(hidden_output_1)
 
-    W2 -= learning_rate * np.dot(hidden_output_1.T, hidden_delta_2)
-    b2 -= learning_rate * np.sum(hidden_delta_2, axis=0)
+        # Gradient clipping
+        for weight in [W4, W3, W2, W1]:
+            np.clip(weight, -gradient_clip_value, gradient_clip_value, out=weight)
 
-    W1 -= learning_rate * np.dot(X_train.T, hidden_delta_1)
-    b1 -= learning_rate * np.sum(hidden_delta_1, axis=0)
+        # Update weights and biases using gradient descent with L2 regularization
+        W4 -= learning_rate * (np.dot(hidden_output_3.T, output_delta) + reg_lambda * W4)
+        b4 -= learning_rate * np.sum(output_delta, axis=0)
 
-    # Print loss every 100 epochs
-    if epoch % 100 == 0:
+        W3 -= learning_rate * (np.dot(hidden_output_2.T, hidden_delta_3) + reg_lambda * W3)
+        b3 -= learning_rate * np.sum(hidden_delta_3, axis=0)
+
+        W2 -= learning_rate * (np.dot(hidden_output_1.T, hidden_delta_2) + reg_lambda * W2)
+        b2 -= learning_rate * np.sum(hidden_delta_2, axis=0)
+
+        W1 -= learning_rate * (np.dot(X_batch.T, hidden_delta_1) + reg_lambda * W1)
+        b1 -= learning_rate * np.sum(hidden_delta_1, axis=0)
+
+    # Print loss every 10 epochs
+    if epoch % 10 == 0:
         print(f"Epoch {epoch}, Loss: {loss}")
 
 # Save the trained model weights
-np.savez('model_weights_improved_v2.npz', W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3, W4=W4, b4=b4)
+np.savez('trained_models/model_weights_improved_v4.npz', W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3, W4=W4, b4=b4)
 
 # Testing the model
 hidden_input_1_test = np.dot(X_test, W1) + b1
-hidden_output_1_test = relu(hidden_input_1_test)
+hidden_output_1_test = leaky_relu(hidden_input_1_test)
 
 hidden_input_2_test = np.dot(hidden_output_1_test, W2) + b2
-hidden_output_2_test = relu(hidden_input_2_test)
+hidden_output_2_test = leaky_relu(hidden_input_2_test)
 
 hidden_input_3_test = np.dot(hidden_output_2_test, W3) + b3
-hidden_output_3_test = relu(hidden_input_3_test)
+hidden_output_3_test = leaky_relu(hidden_input_3_test)
 
 final_input_test = np.dot(hidden_output_3_test, W4) + b4
 y_pred_test = softmax(final_input_test)
@@ -137,4 +161,11 @@ for i, ax in enumerate(axes):
     ax.set_title(f"Pred: {y_pred_class[i]} / True: {y_test_class[i]}")
     ax.axis("off")
 
+plt.show()
+
+# Plot the loss curve to visualize training progress
+plt.plot(losses)
+plt.title("Training Loss Curve")
+plt.xlabel("Iterations")
+plt.ylabel("Loss")
 plt.show()
