@@ -72,8 +72,8 @@ def cross_entropy_loss(y_pred, y_true, reg_lambda=0.01):
 
 # Mini-batch Gradient Descent parameters
 batch_size = 64
-learning_rate = 0.0005  # Lower learning rate for better stability
-epochs = 100
+learning_rate = 0.00025  # Lower learning rate for better stability
+epochs = 10000
 gradient_clip_value = 5  # Gradient clipping threshold
 
 # To store the loss for visualization
