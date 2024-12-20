@@ -19,18 +19,18 @@ X_train, X_test, y_train, y_test = train_test_split(X, y_one_hot, test_size=0.2,
 
 # Initialize weights and biases using Xavier initialization
 input_size = 784  # 28x28 pixels
-hidden_size_1 = 128
-hidden_size_2 = 64
-hidden_size_3 = 32  # Additional hidden layer for increased depth
+hidden_size_1 = 4
+hidden_size_2 = 4
+hidden_size_3 = 4  # Additional hidden layer for increased depth
 output_size = 10  # 10 digits (0-9)
-reg_lambda = 0.01
+reg_lambda = 0.1
 
 # Xavier initialization (Glorot initialization)
 def xavier_initialization(size_in, size_out):
     return np.random.randn(size_in, size_out) * np.sqrt(2. / (size_in + size_out))
 
 # Check if model weights file exists
-model_file = 'trained_models/model_weights_improved_v4.npz'
+model_file = 'trained_models/model_weights_improved_v7.npz'
 if os.path.exists(model_file):
     print("Loading pre-trained model weights...")
     # Load the saved model weights
@@ -72,8 +72,8 @@ def cross_entropy_loss(y_pred, y_true, reg_lambda=0.01):
 
 # Mini-batch Gradient Descent parameters
 batch_size = 64
-learning_rate = 0.00025  # Lower learning rate for better stability
-epochs = 10000
+learning_rate = 0.00000001  # Lower learning rate for better stability
+epochs = 10
 gradient_clip_value = 5  # Gradient clipping threshold
 
 # To store the loss for visualization
@@ -144,7 +144,7 @@ for epoch in range(epochs):
         print(f"Epoch {epoch}, Loss: {loss}")
 
 # Save the trained model weights
-np.savez('trained_models/model_weights_improved_v4.npz', W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3, W4=W4, b4=b4)
+np.savez('trained_models/model_weights_improved_v7.npz', W1=W1, b1=b1, W2=W2, b2=b2, W3=W3, b3=b3, W4=W4, b4=b4)
 
 # Testing the model
 hidden_input_1_test = np.dot(X_test, W1) + b1

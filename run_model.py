@@ -17,7 +17,7 @@ y_one_hot = encoder.fit_transform(y.reshape(-1, 1))
 X_test, y_test = X, y_one_hot  # We are only testing in this script
 
 # Load the pre-trained model weights
-model_file = 'trained_models/model_weights_improved_v4.npz'
+model_file = 'trained_models/model_weights_improved_v7.npz'
 if os.path.exists(model_file):
     print("Loading pre-trained model weights...")
     model = np.load(model_file)
